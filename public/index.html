@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Email Client</title>
+    <!-- You can link a CSS file here later if you want styling -->
+    <!-- <link rel="stylesheet" href="style.css"> -->
+    <style>
+        /* Basic styling for visibility */
+        body { font-family: sans-serif; padding: 20px; }
+        #content { border: 1px solid #ccc; padding: 15px; margin-top: 15px; min-height: 200px; white-space: pre-wrap; /* Preserve whitespace/newlines from LLM */ }
+        button { padding: 10px 15px; margin-bottom: 10px; cursor: pointer; }
+        #loading { display: none; color: blue; } /* Hidden by default */
+    </style>
+</head>
+<body>
+    <h1>LLM Email Client Demo</h1>
+
+    <button id="loginButton">Login with Gmail</button>
+
+    <div id="loading">Loading...</div>
+
+    <div id="content">
+        <!-- LLM-generated UI will be injected here -->
+        Please log in to view your emails.
+    </div>
+
+    <!-- Link to your compiled JavaScript file -->
+    <script src="main.js"></script>
+</body>
+</html>

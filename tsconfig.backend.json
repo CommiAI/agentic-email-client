@@ -1,0 +1,10 @@
+{
+    "extends": "./tsconfig.json", // Inherit common settings
+    "compilerOptions": {
+      "module": "commonjs",         // Node.js uses CommonJS modules
+      "outDir": "./dist",           // Output backend JS to 'dist' folder
+      "rootDir": "."           // Specify the root of the source files
+    },
+    "include": ["src/**/*", "baml_client/**/*"],   // Compile .ts files in the 'src' and 'baml_client' directories
+    "exclude": ["node_modules"]     // Exclude node_modules
+  }

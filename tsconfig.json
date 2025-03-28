@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        // Keep common settings here
+        "target": "es2018", // Good target for Node & modern browsers
+        "moduleResolution": "node",   // How modules are found
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+    },
+}

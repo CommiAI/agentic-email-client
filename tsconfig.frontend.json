@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.json", // Inherit common settings
+    "compilerOptions": {
+      "module": "esnext",           // Use modern ES modules for the browser
+      "outDir": "./public",         // Output frontend JS to 'public' folder
+      "rootDir": "./public",        // Specify the root of the source files
+      "declaration": false,         // No need for .d.ts files in the browser JS
+      "noEmitOnError": false        // Allow emitting JS even if there are minor TS errors (can be helpful)
+    },
+    "include": ["public/**/*.ts"],    // Compile .ts files in the 'public' directory
+    "exclude": ["node_modules"]     // Exclude node_modules
+  }
