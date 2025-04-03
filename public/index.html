@@ -3,30 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LLM Email Client</title>
-    <!-- You can link a CSS file here later if you want styling -->
-    <!-- <link rel="stylesheet" href="style.css"> -->
+    <title>Email Client</title>
     <style>
-        /* Basic styling for visibility */
-        body { font-family: sans-serif; padding: 20px; }
-        #content { border: 1px solid #ccc; padding: 15px; margin-top: 15px; min-height: 200px; white-space: pre-wrap; /* Preserve whitespace/newlines from LLM */ }
-        button { padding: 10px 15px; margin-bottom: 10px; cursor: pointer; }
-        #loading { display: none; color: blue; } /* Hidden by default */
+        /* Minimal styling for loading indicator */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: #333;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
-    <h1>LLM Email Client Demo</h1>
+    <!-- Minimal shell that will be completely replaced by LLM content -->
+    <div id="loading">Connecting to email service...</div>
+    <div id="app"></div>
 
-    <button id="loginButton">Login with Gmail</button>
-
-    <div id="loading">Loading...</div>
-
-    <div id="content">
-        <!-- LLM-generated UI will be injected here -->
-        Please log in to view your emails.
-    </div>
-
-    <!-- Link to your compiled JavaScript file -->
+    <!-- Script to handle authentication and LLM interaction -->
     <script src="main.js"></script>
 </body>
 </html>

@@ -6,9 +6,9 @@
   "scripts": {
     "baml-generate": "baml-cli generate",
     "build:backend": "tsc -p tsconfig.backend.json",
-    "build:frontend": "tsc -p tsconfig.frontend.json", 
-    "build": "npm run baml-generate && npm run build:backend && npm run build:frontend", 
-    "start:dev": "ts-node-dev --respawn --transpile-only src/server.ts", 
+    "build:frontend": "tsc -p tsconfig.frontend.json",
+    "build": "npm run baml-generate && npm run build:backend && npm run build:frontend",
+    "start:dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "start": "npx ts-node-dev src/server.ts"
   },
   "keywords": [],
@@ -23,7 +23,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@boundaryml/baml": "^0.81.3",
+    "@boundaryml/baml": "^0.82.0",
     "axios": "^1.8.4",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",

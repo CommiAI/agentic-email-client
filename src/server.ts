@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express'; // For creating the web server
+import express, { Request, Response, NextFunction } from "express"; // For creating the web server
 import { OAuth2Client } from "google-auth-library"; // Google's library for OAuth
 import { google, gmail_v1 } from "googleapis";
 import path from "path"; // Node.js module for working with file paths
@@ -95,10 +95,10 @@ const oauthCallbackHandler = async (req: Request, res: Response) => {
     const { tokens } = await oauth2Client.getToken(code);
     console.log("Tokens received successfully from Google.");
     if (tokens.refresh_token) {
-        console.log("Refresh token was present in the response.");
+      console.log("Refresh token was present in the response.");
     }
     if (tokens.access_token) {
-        console.log("Access token was present in the response.");
+      console.log("Access token was present in the response.");
     }
 
     // --- Store Tokens (Temporary In-Memory Method) ---
@@ -119,9 +119,9 @@ const oauthCallbackHandler = async (req: Request, res: Response) => {
     oauth2Client.setCredentials(tokens);
     console.log("OAuth2 client credentials set.");
 
-    // Redirect the user back to the main page of your application
-    console.log("Redirecting back to application root...");
-    res.redirect("/");
+    // Redirect the user back to the main page of your application with authentication flag
+    console.log("Redirecting back to application root with authentication flag...");
+    res.redirect("/?justAuthenticated=true");
   } catch (error) {
     console.error("Error exchanging authorization code for tokens:", error);
     // Check if error is an AxiosError or similar to get more details
@@ -132,11 +132,13 @@ const oauthCallbackHandler = async (req: Request, res: Response) => {
   }
 };
 
-
 // Route to handle the callback from Google after user grants permission
-app.get('/oauth2callback', (req: Request, res: Response, next: NextFunction) => {
-  oauthCallbackHandler(req, res).catch(next);
-});
+app.get(
+  "/oauth2callback",
+  (req: Request, res: Response, next: NextFunction) => {
+    oauthCallbackHandler(req, res).catch(next);
+  }
+);
 
 console.log("OAuth routes added.");
 
@@ -148,8 +150,11 @@ function getGmailClient(): gmail_v1.Gmail | null {
     return null;
   }
   // Ensure the oauth2Client has the latest credentials (might be redundant if set on callback, but safe)
-  oauth2Client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
-  return google.gmail({ version: 'v1', auth: oauth2Client });
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  return google.gmail({ version: "v1", auth: oauth2Client });
 }
 
 /**
@@ -164,14 +169,14 @@ async function getEmailList(maxResults = 15): Promise<any[] | null> {
   try {
     // 1. List message IDs
     const listResponse = await gmail.users.messages.list({
-      userId: 'me',
+      userId: "me",
       maxResults: maxResults,
-      q: 'in:inbox' // Only fetch inbox messages, you can adjust query
+      q: "in:inbox", // Only fetch inbox messages, you can adjust query
     });
 
     const messages = listResponse.data.messages;
     if (!messages || messages.length === 0) {
-      console.log('No messages found.');
+      console.log("No messages found.");
       return [];
     }
 
@@ -182,45 +187,55 @@ async function getEmailList(maxResults = 15): Promise<any[] | null> {
       if (!message.id) return null;
       try {
         const msgResponse = await gmail.users.messages.get({
-          userId: 'me',
+          userId: "me",
           id: message.id,
-          format: 'metadata', // Fetch only headers/metadata
-          metadataHeaders: ['Subject', 'From', 'Date'] // Specify needed headers
+          format: "metadata", // Fetch only headers/metadata
+          metadataHeaders: ["Subject", "From", "Date"], // Specify needed headers
         });
 
         const headers = msgResponse.data.payload?.headers;
-        if (!headers) return { id: message.id, snippet: msgResponse.data.snippet || 'No snippet' };
+        if (!headers)
+          return {
+            id: message.id,
+            snippet: msgResponse.data.snippet || "No snippet",
+          };
 
-        const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-        const from = headers.find(h => h.name === 'From')?.value || 'No Sender';
-        const date = headers.find(h => h.name === 'Date')?.value || 'No Date';
+        const subject =
+          headers.find((h) => h.name === "Subject")?.value || "No Subject";
+        const from =
+          headers.find((h) => h.name === "From")?.value || "No Sender";
+        const date = headers.find((h) => h.name === "Date")?.value || "No Date";
 
         return {
           id: message.id,
           subject: subject,
           from: from,
           date: date,
-          snippet: msgResponse.data.snippet || ''
+          snippet: msgResponse.data.snippet || "",
         };
       } catch (err) {
-        console.error(`Error fetching metadata for message ${message.id}:`, err);
+        console.error(
+          `Error fetching metadata for message ${message.id}:`,
+          err
+        );
         return null; // Skip this email on error
       }
     });
 
-    const emailList = (await Promise.all(emailListPromises)).filter(email => email !== null); // Filter out nulls from errors
+    const emailList = (await Promise.all(emailListPromises)).filter(
+      (email) => email !== null
+    ); // Filter out nulls from errors
     console.log("getEmailList successful, returning list.");
     return emailList;
-
   } catch (error) {
-    console.error('Error fetching email list:', error);
+    console.error("Error fetching email list:", error);
     // Handle potential auth errors (e.g., expired token) - requires refresh logic later
-     if (axios.isAxiosError(error) && error.response?.status === 401) {
-         console.error("Auth error (token might be expired)");
-         // Reset token to force re-login for now
-         accessToken = null;
-         refreshToken = null;
-     }
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      console.error("Auth error (token might be expired)");
+      // Reset token to force re-login for now
+      accessToken = null;
+      refreshToken = null;
+    }
     return null; // Indicate failure
   }
 }
@@ -235,40 +250,43 @@ async function getEmailDetails(messageId: string): Promise<any | null> {
   if (!gmail) return null; // Not authenticated
 
   if (!messageId) {
-      console.error("getEmailDetails called without messageId");
-      return null;
+    console.error("getEmailDetails called without messageId");
+    return null;
   }
 
   try {
     const msgResponse = await gmail.users.messages.get({
-      userId: 'me',
+      userId: "me",
       id: messageId,
-      format: 'full' // Fetch the full message payload
+      format: "full", // Fetch the full message payload
     });
 
     const payload = msgResponse.data.payload;
     const headers = payload?.headers;
     if (!payload || !headers) {
-        console.error(`No payload or headers found for message ${messageId}`);
-        return null;
+      console.error(`No payload or headers found for message ${messageId}`);
+      return null;
     }
 
-    const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-    const from = headers.find(h => h.name === 'From')?.value || 'No Sender';
-    const date = headers.find(h => h.name === 'Date')?.value || 'No Date';
-    const to = headers.find(h => h.name === 'To')?.value || 'No Recipient'; // Added To header
+    const subject =
+      headers.find((h) => h.name === "Subject")?.value || "No Subject";
+    const from = headers.find((h) => h.name === "From")?.value || "No Sender";
+    const date = headers.find((h) => h.name === "Date")?.value || "No Date";
+    const to = headers.find((h) => h.name === "To")?.value || "No Recipient"; // Added To header
 
     // --- Body Parsing Logic (Simplified) ---
-    let body = '';
+    let body = "";
     if (payload.parts) {
       // Handle multipart messages (common)
-      const part = payload.parts.find(p => p.mimeType === 'text/plain') || payload.parts.find(p => p.mimeType === 'text/html');
+      const part =
+        payload.parts.find((p) => p.mimeType === "text/plain") ||
+        payload.parts.find((p) => p.mimeType === "text/html");
       if (part?.body?.data) {
-        body = Buffer.from(part.body.data, 'base64').toString('utf-8');
+        body = Buffer.from(part.body.data, "base64").toString("utf-8");
       }
     } else if (payload.body?.data) {
       // Handle single part messages
-       body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+      body = Buffer.from(payload.body.data, "base64").toString("utf-8");
     }
 
     // If HTML body was found and no plain text, you might want to strip HTML tags for simplicity
@@ -276,40 +294,147 @@ async function getEmailDetails(messageId: string): Promise<any | null> {
     // For now, we just return whatever we found first (prefer plain text)
 
     const emailDetails = {
-        id: messageId,
-        subject: subject,
-        from: from,
-        to: to, // Added To field
-        date: date,
-        body: body || 'No body content found or could not parse.',
-        snippet: msgResponse.data.snippet || '' // Include snippet as well
+      id: messageId,
+      subject: subject,
+      from: from,
+      to: to, // Added To field
+      date: date,
+      body: body || "No body content found or could not parse.",
+      snippet: msgResponse.data.snippet || "", // Include snippet as well
     };
 
     console.log(`getEmailDetails successful for ID: ${messageId}`);
     return emailDetails;
-
   } catch (error) {
     console.error(`Error fetching details for message ${messageId}:`, error);
-     if (axios.isAxiosError(error) && error.response?.status === 401) {
-         console.error("Auth error (token might be expired)");
-         accessToken = null;
-         refreshToken = null;
-     }
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      console.error("Auth error (token might be expired)");
+      accessToken = null;
+      refreshToken = null;
+    }
     return null; // Indicate failure
   }
 }
 
 console.log("Gmail API tool functions added.");
 
-// --- Placeholder for /api/llm endpoint ---
+// --- Call the Email Client Agent ---
+async function callEmailClientAgent(
+  user_interaction: string
+): Promise<string | null> {
+  console.log(
+    `Calling email client agent with user_interaction: ${user_interaction}`
+  );
+
+  let current_information = ""; // Start with empty information
+  let action = user_interaction; // Initial action is the user interaction (e.g., click target)
+
+  while (true) {
+    // Call the BAML client's SimulateEmailClient function
+    const results = await b.SimulateEmailClient(action, current_information);
+    console.log("SimulateEmailClient returned:", results);
+
+    // Check if results is an array and process it
+    if (!Array.isArray(results)) {
+      console.error(
+        "Expected an array from SimulateEmailClient, got:",
+        results
+      );
+      return null;
+    }
+
+    let hasHTML = false;
+    let htmlContent: string | null = null;
+
+    // Process results in sequence to handle tool calls before returning HTML
+    for (const result of results) {
+      if (result.class_name === "HTMLContent") {
+        // Check if the result is of type HTMLContent
+        // If HTML is found, store it
+        htmlContent = result.content;
+        hasHTML = true;
+
+        // Use the HTML content as-is from the LLM
+      } else if (result.class_name === "GetEmailListInput") {
+        // Handle GetEmailList tool call
+        const emailList = await getEmailList(result.maxResults);
+        if (emailList) {
+          current_information = JSON.stringify(emailList);
+          console.log(
+            "Updated current_information with email list:",
+            current_information
+          );
+        } else {
+          current_information = JSON.stringify({
+            error: "Failed to fetch email list",
+          });
+          console.error("Failed to fetch email list");
+        }
+      } else if (result.class_name === "GetEmailDetailsInput") {
+        // Handle GetEmailDetails tool call
+        const emailDetails = await getEmailDetails(result.id);
+        if (emailDetails) {
+          current_information = JSON.stringify(emailDetails);
+          console.log(
+            "Updated current_information with email details:",
+            current_information
+          );
+        } else {
+          current_information = JSON.stringify({
+            error: `Failed to fetch email details for ID ${result.id}`,
+          });
+          console.error(`Failed to fetch email details for ID ${result.id}`);
+        }
+      }
+      // Add handling for other potential result.class_name values if necessary
+    }
+
+    // If HTML was found, return it
+    // This code runs AFTER all async operations in the loop are complete
+    if (hasHTML) {
+      console.log("Returning HTML content");
+      return htmlContent;
+    }
+
+    // If no HTML, loop again with updated information and no new action
+    // current_information will be correctly updated from any tool calls above
+    action = ""; // Clear action for subsequent calls after tool execution
+  }
+}
+const llmHandler = async (req: Request, res: Response) => {
+  console.log("Received request at /api/llm");
+  const { target } = req.body;
+
+  if (!target || typeof target !== "string") {
+    console.error("Invalid or missing 'target' in request body:", req.body);
+    throw new Error("Missing or invalid 'target' field");
+  }
+
+  // The target is already properly formatted from the frontend
+  const userInteraction = target;
+  console.log("Processing user interaction:", userInteraction);
+
+  const htmlContent = await callEmailClientAgent(userInteraction);
+
+  if (htmlContent === null) {
+    console.error("callEmailClientAgent returned null");
+    throw new Error("Failed to generate HTML content");
+  }
+
+  res.json({ html: htmlContent });
+};
+
+app.post('/api/llm', (req: Request, res: Response, next: NextFunction) => {
+  llmHandler(req, res).catch(next);
+});
 
 console.log("Basic server configuration complete.");
 
 // --- Start the Server (We'll add this at the very end) ---
-  app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-    console.log(`Visit http://localhost:${PORT}`);
-  });
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+  console.log(`Visit http://localhost:${PORT}`);
+});
 
 // Export the app and oauth2Client if needed by other potential modules (optional for now)
 // export { app, oauth2Client };

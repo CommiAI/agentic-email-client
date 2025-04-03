@@ -7,3 +7,9 @@ All notable changes to this project will be documented in this file.
 - Initial project setup
 - Email OAuth client, get email list and get email details tools implemented.
 - Browser communications implemented.
+
+## [0.1.1] - 2025-04-03
+
+### Added
+- BAML AI layer implemented.
+- Email client agentic flow implemented.

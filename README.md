@@ -10,7 +10,7 @@ This project draws inspiration from the ideas presented in the following video:
 [Rethinking how we Scaffold AI Agents](https://www.youtube.com/watch?v=-rsTkYgnNzM&t=691s)
 
 ## Next Actions
-- Implement BAML code to connect LLM to the tools established.
+- Add previous HTML into context for agent to retain information.
 
 ## License
 [MIT License](LICENSE)
