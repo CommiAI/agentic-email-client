@@ -319,6 +319,9 @@ async function getEmailDetails(messageId: string): Promise<any | null> {
 console.log("Gmail API tool functions added.");
 
 // --- Call the Email Client Agent ---
+// Store agent context for each user session (in a real app, this would be per-user)
+let agentContextHistory: string = "";
+
 async function callEmailClientAgent(
   user_interaction: string
 ): Promise<string | null> {
@@ -327,11 +330,24 @@ async function callEmailClientAgent(
   );
 
   let current_information = ""; // Start with empty information
+  let current_context = agentContextHistory; // Use the stored context history
   let action = user_interaction; // Initial action is the user interaction (e.g., click target)
+
+  // Add counters to track repetitive tool calls
+  let toolCallCounts: Record<string, number> = {
+    "GetEmailListInput": 0,
+    "GetEmailDetailsInput": 0
+  };
+  let lastToolCalled: string | null = null;
+
+  console.log(`Starting agent loop with context size: ${current_context.length} characters`);
+  if (current_context) {
+    console.log(`Context contains information from the previous agent loop only`);
+  }
 
   while (true) {
     // Call the BAML client's SimulateEmailClient function
-    const results = await b.SimulateEmailClient(action, current_information);
+    const results = await b.SimulateEmailClient(action, current_information, current_context);
     console.log("SimulateEmailClient returned:", results);
 
     // Check if results is an array and process it
@@ -356,10 +372,34 @@ async function callEmailClientAgent(
 
         // Use the HTML content as-is from the LLM
       } else if (result.class_name === "GetEmailListInput") {
+        // Track repetitive tool calls
+        toolCallCounts["GetEmailListInput"]++;
+
+        // Check if this is a repetitive call
+        if (lastToolCalled === "GetEmailListInput") {
+          const repeatCount = toolCallCounts["GetEmailListInput"];
+          if (repeatCount > 1) {
+            // Add warning to context about repetitive calls
+            current_context += `\nWARNING: You have already called GetEmailList ${repeatCount} times. You should move on.\n`;
+            console.log(`Detected repetitive GetEmailList calls: ${repeatCount} times`);
+          }
+        }
+        lastToolCalled = "GetEmailListInput";
+
         // Handle GetEmailList tool call
         const emailList = await getEmailList(result.maxResults);
         if (emailList) {
           current_information = JSON.stringify(emailList);
+
+          // Add to context that we fetched an email list
+          current_context += `\nTool Call: GetEmailList\nResult: Retrieved ${emailList.length} emails\n`;
+
+          // Add a summary of the emails to the context
+          current_context += "Email Summary:\n";
+          emailList.forEach((email: any) => {
+            current_context += `Email ID: ${email.id}, Subject: "${email.subject}", From: ${email.from}\n`;
+          });
+
           console.log(
             "Updated current_information with email list:",
             current_information
@@ -371,10 +411,28 @@ async function callEmailClientAgent(
           console.error("Failed to fetch email list");
         }
       } else if (result.class_name === "GetEmailDetailsInput") {
+        // Track repetitive tool calls
+        toolCallCounts["GetEmailDetailsInput"]++;
+
+        // Check if this is a repetitive call
+        if (lastToolCalled === "GetEmailDetailsInput") {
+          const repeatCount = toolCallCounts["GetEmailDetailsInput"];
+          if (repeatCount > 1) {
+            // Add warning to context about repetitive calls
+            current_context += `\nWARNING: You have already called GetEmailDetails ${repeatCount} times. You should move on.\n`;
+            console.log(`Detected repetitive GetEmailDetails calls: ${repeatCount} times`);
+          }
+        }
+        lastToolCalled = "GetEmailDetailsInput";
+
         // Handle GetEmailDetails tool call
         const emailDetails = await getEmailDetails(result.id);
         if (emailDetails) {
           current_information = JSON.stringify(emailDetails);
+
+          // Add to context that we fetched email details with the specific ID
+          current_context += `\nTool Call: GetEmailDetails\nEmail ID: ${result.id}\nSubject: ${emailDetails.subject}\nFrom: ${emailDetails.from}\nDate: ${emailDetails.date}\n`;
+
           console.log(
             "Updated current_information with email details:",
             current_information
@@ -389,9 +447,17 @@ async function callEmailClientAgent(
       // Add handling for other potential result.class_name values if necessary
     }
 
-    // If HTML was found, return it
+    // If HTML was found, update context history and return the HTML
     // This code runs AFTER all async operations in the loop are complete
     if (hasHTML) {
+      // Reset the context with only the current loop information
+      // Include both the user interaction, the information retrieved, and the HTML response
+      let newContext = `User Interaction: ${action}\nInformation: ${current_information}\nHTML Generated: ${htmlContent ? "[HTML content generated]" : "None"}\n`;
+
+      // Replace (not append to) the agent context history for the next agent loop
+      agentContextHistory = newContext;
+
+      console.log("Reset agent context history. Current size:", agentContextHistory.length);
       console.log("Returning HTML content");
       return htmlContent;
     }

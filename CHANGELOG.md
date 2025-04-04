@@ -13,3 +13,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - BAML AI layer implemented.
 - Email client agentic flow implemented.
+
+## [0.1.1] - 2025-04-04
+
+### Added
+- Previous context for BAML AI layer implemented.
+- Added unstuck nudge in repetitive tool calls.
