@@ -60,11 +60,9 @@ console.log("Using temporary in-memory token storage.");
 
 // Route to start the Google OAuth flow
 app.get("/auth/google", (req, res) => {
-  // Define the scopes (permissions) we need. Start with read-only.
+  // Changed OAuth scope
   const scopes = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    // Later, for sending/deleting, you might add:
-    // 'https://www.googleapis.com/auth/gmail.modify'
+    'https://www.googleapis.com/auth/gmail.modify',
   ];
 
   // Generate the URL that will redirect the user to Google's consent screen
@@ -316,6 +314,102 @@ async function getEmailDetails(messageId: string): Promise<any | null> {
   }
 }
 
+/**
+ * Sends an email using the Gmail API.
+ * Corresponds to a tool the LLM can call.
+ */
+async function sendEmail(to: string, subject: string, body: string): Promise<any | null> {
+  console.log(`Tool Function: sendEmail called to: ${to}, subject: ${subject}`);
+  const gmail = getGmailClient();
+  if (!gmail) return null; // Not authenticated
+
+  if (!to || !subject || !body) {
+    console.error("sendEmail called with missing parameters");
+    return null;
+  }
+
+  try {
+    // Create the email content in base64 encoded format
+    const emailLines = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      body
+    ];
+
+    const email = emailLines.join('\r\n');
+    const encodedEmail = Buffer.from(email).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    // Send the email
+    const result = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedEmail
+      }
+    });
+
+    console.log(`sendEmail successful, message ID: ${result.data.id}`);
+    return {
+      success: true,
+      messageId: result.data.id,
+      message: "Email sent successfully"
+    };
+  } catch (error) {
+    console.error("Error sending email:", error);
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      console.error("Auth error (token might be expired)");
+      accessToken = null;
+      refreshToken = null;
+    }
+    return {
+      success: false,
+      error: "Failed to send email"
+    };
+  }
+}
+
+/**
+ * Deletes an email message using the Gmail API.
+ * Corresponds to a tool the LLM can call.
+ */
+async function deleteEmail(messageId: string): Promise<any | null> {
+  console.log(`Tool Function: deleteEmail called for ID: ${messageId}`);
+  const gmail = getGmailClient();
+  if (!gmail) return null; // Not authenticated
+
+  if (!messageId) {
+    console.error("deleteEmail called without messageId");
+    return null;
+  }
+
+  try {
+    // Move the message to trash
+    await gmail.users.messages.trash({
+      userId: 'me',
+      id: messageId
+    });
+
+    console.log(`deleteEmail successful for ID: ${messageId}`);
+    return {
+      success: true,
+      messageId: messageId,
+      message: "Email moved to trash successfully"
+    };
+  } catch (error) {
+    console.error(`Error deleting message ${messageId}:`, error);
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      console.error("Auth error (token might be expired)");
+      accessToken = null;
+      refreshToken = null;
+    }
+    return {
+      success: false,
+      error: `Failed to delete email with ID ${messageId}`
+    };
+  }
+}
+
 console.log("Gmail API tool functions added.");
 
 // --- Call the Email Client Agent ---
@@ -336,7 +430,9 @@ async function callEmailClientAgent(
   // Add counters to track repetitive tool calls
   let toolCallCounts: Record<string, number> = {
     "GetEmailListInput": 0,
-    "GetEmailDetailsInput": 0
+    "GetEmailDetailsInput": 0,
+    "SendEmailInput": 0,
+    "DeleteEmailInput": 0
   };
   let lastToolCalled: string | null = null;
 
@@ -442,6 +538,72 @@ async function callEmailClientAgent(
             error: `Failed to fetch email details for ID ${result.id}`,
           });
           console.error(`Failed to fetch email details for ID ${result.id}`);
+        }
+      } else if (result.class_name === "SendEmailInput") {
+        // Track repetitive tool calls
+        toolCallCounts["SendEmailInput"]++;
+
+        // Check if this is a repetitive call
+        if (lastToolCalled === "SendEmailInput") {
+          const repeatCount = toolCallCounts["SendEmailInput"];
+          if (repeatCount > 1) {
+            // Add warning to context about repetitive calls
+            current_context += `\nWARNING: You have already called SendEmail ${repeatCount} times. You should move on.\n`;
+            console.log(`Detected repetitive SendEmail calls: ${repeatCount} times`);
+          }
+        }
+        lastToolCalled = "SendEmailInput";
+
+        // Handle SendEmail tool call
+        const emailResult = await sendEmail(result.to, result.subject, result.body);
+        if (emailResult && emailResult.success) {
+          current_information = JSON.stringify(emailResult);
+
+          // Add to context that we sent an email
+          current_context += `\nTool Call: SendEmail\nTo: ${result.to}\nSubject: ${result.subject}\nResult: Email sent successfully with ID: ${emailResult.messageId}\n`;
+
+          console.log(
+            "Updated current_information with send email result:",
+            current_information
+          );
+        } else {
+          current_information = JSON.stringify({
+            error: "Failed to send email",
+          });
+          console.error("Failed to send email");
+        }
+      } else if (result.class_name === "DeleteEmailInput") {
+        // Track repetitive tool calls
+        toolCallCounts["DeleteEmailInput"]++;
+
+        // Check if this is a repetitive call
+        if (lastToolCalled === "DeleteEmailInput") {
+          const repeatCount = toolCallCounts["DeleteEmailInput"];
+          if (repeatCount > 1) {
+            // Add warning to context about repetitive calls
+            current_context += `\nWARNING: You have already called DeleteEmail ${repeatCount} times. You should move on.\n`;
+            console.log(`Detected repetitive DeleteEmail calls: ${repeatCount} times`);
+          }
+        }
+        lastToolCalled = "DeleteEmailInput";
+
+        // Handle DeleteEmail tool call
+        const deleteResult = await deleteEmail(result.id);
+        if (deleteResult && deleteResult.success) {
+          current_information = JSON.stringify(deleteResult);
+
+          // Add to context that we deleted an email
+          current_context += `\nTool Call: DeleteEmail\nEmail ID: ${result.id}\nResult: Email moved to trash successfully\n`;
+
+          console.log(
+            "Updated current_information with delete email result:",
+            current_information
+          );
+        } else {
+          current_information = JSON.stringify({
+            error: `Failed to delete email with ID ${result.id}`,
+          });
+          console.error(`Failed to delete email with ID ${result.id}`);
         }
       }
       // Add handling for other potential result.class_name values if necessary
