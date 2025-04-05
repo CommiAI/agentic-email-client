@@ -10,8 +10,8 @@ This project draws inspiration from the ideas presented in the following video:
 [Rethinking how we Scaffold AI Agents](https://www.youtube.com/watch?v=-rsTkYgnNzM&t=691s)
 
 ## Next Actions
-- Add delete email function tool to the LLM.
-- Refine prompt for better navigation and full functionality for the email client.
+- Add before authentication allignment to allow user to key in theme for email client.
+- Refine prompt for consistent aesthetic across different user interactions.
 
 ## License
 [MIT License](LICENSE)

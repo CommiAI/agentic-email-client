@@ -9,34 +9,59 @@ class GetEmailDetailsInput {
   id string @description("The ID of the email thread/message to retrieve details for.")
 }
 
+class SendEmailInput {
+  class_name "SendEmailInput" @alias("Tool")
+  to string @description("The recipient email address.")
+  subject string @description("The subject of the email.")
+  body string @description("The body content of the email.")
+}
+
+class DeleteEmailInput {
+  class_name "DeleteEmailInput" @alias("Tool")
+  id string @description("The ID of the email thread/message to delete.")
+}
+
 class HTMLContent {
   class_name "HTMLContent" @alias("Output")
   content string @description("The HTML content to be displayed in the email client.")
 }
 
 // Create a function to simulate an email client.
-function SimulateEmailClient(user_action: string, information: string, context: string) -> (GetEmailListInput | GetEmailDetailsInput | HTMLContent)[] {
-  client GeminiClient 
+function SimulateEmailClient(user_action: string, information: string, context: string) -> (GetEmailListInput | GetEmailDetailsInput | SendEmailInput | DeleteEmailInput | HTMLContent)[] {
+  client GeminiClient
 
   prompt #"
     {{ _.role("system") }}
-    You are an agentic email client that simulates the behavior of a real email client.
-    As an email client, your job is to simulate the backend and the frontend of the email client.
-    You will receive a user interaction and your final output should be a HTML that shows the user what they are supposed to see in the email client.
+    You are an agentic email client that simulates the behavior of a real email client by simulating the backend and the frontend of the email client.
+    
+    This is how you should operate:
+    <OPERATION>
+    1. You will receive a user interaction.
+    2. You should decide what would happen based on the user interaction, such as navigation, functionality, etc.
+    3. You can execute tools to get the information needed to proceed the user interaction.
+    4. You will generate a HTML that shows the user what they are supposed to see in the email client.
+    </OPERATION>
 
-    {{ ctx.output_format }} 
+    When generating HTML to show to the user, you should follow these rules:
+    <RULES>
+    1. The HTML generated should not have any actual functionality, such as onclick, href, etc.
+    2. The HTML generated is just a representation of what the user should see in the email client, while the actual functionality is handled the agentic email client.
+    3. The HTML generated should include all the basic functionality of an email client, such as navigation, sending emails, deleting emails, etc.
+    </RULES>
+
+    {{ ctx.output_format }}
 
     {{ _.role("user") }}
-    
+
     User Interaction:
     {{ user_action }}
 
-    Information:
+    Information from tools:
     {{ information }}
-    
+
     Previous Context:
     {{ context }}
-    
+
   "#
 }
 
@@ -48,10 +73,10 @@ test AfterAuthentication {
       User just finished authenticating with the email client. Show the inbox.
     "#
     information #"
-      
+
     "#
     context #"
-      
+
     "#
   }
 }
@@ -78,7 +103,7 @@ test AfterEmailList {
     },
     "#
     context #"
-      
+
     "#
   }
 }
@@ -100,7 +125,7 @@ test AfterEmailClick {
         "snippet": "Dear Team, I hope this email finds you well. Our quarterly team meeting is scheduled for next week, and I wanted to share the agenda and some important updates."
       }
     "#
-    context #" 
+    context #"
     Information: {"id":"195dbdf6464e71d0","subject":"Important Update: New Project Management Tool","from":"IT Department <it@company.com>","to":"all-employees@company.com","date":"Mon, 15 Apr 2025 09:00:00 -0700","body":"Dear Colleagues,\r\n\r\nWe are excited to announce the implementation of a new project management tool, effective May 1, 2025. This tool will streamline our workflow and improve collaboration across departments.\r\n\r\nKey Points:\r\n\r\n1. Launch Date: May 1, 2025\r\n2. Mandatory Training: April 20-30, 2025\r\n3. Features: Task tracking, time management, team collaboration\r\n4. Benefits: Increased productivity, better resource allocation\r\n\r\nPlease note that all employees are required to complete the online training course by April 30. You will receive a separate email with login credentials for the training platform.\r\n\r\nIf you have any questions or concerns, please don't hesitate to reach out to the IT support team.\r\n\r\nBest regards,\r\nIT Department","snippet":"Dear Colleagues, We are excited to announce the implementation of a new project management tool, effective May 1, 2025. This tool will streamline our workflow and improve collaboration across departments."}
     HTML Generated: <html><body><h1>Email Details</h1><p><strong>Subject:</strong> Quarterly Team Meeting - Agenda and Updates</p><p><strong>From:</strong> Team Lead &lt;teamlead@company.com&gt;</p><p><strong>To:</strong> team@company.com</p><p><strong>Date:</strong> Mon, 31 Mar 2025 09:30:00 GMT</p><p><strong>Body:</strong></p><pre>Dear Team,
 
