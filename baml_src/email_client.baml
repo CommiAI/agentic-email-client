@@ -1,4 +1,10 @@
 // Defining a data model.
+
+class Message {
+  role "user" | "assistant"
+  content string
+}
+
 class GetEmailListInput {
   class_name "GetEmailListInput" @alias("Tool")
   maxResults int @description("The maximum number of email threads/messages to get.")
@@ -26,8 +32,16 @@ class HTMLContent {
   content string @description("The HTML content to be displayed in the email client.")
 }
 
+template_string PrintMessages(messages: Message[]) #"
+  {% for m in messages %}
+    {{ _.role(m.role) }}
+    {{ m.content }}
+  {% endfor %}
+"#
+
 // Create a function to simulate an email client.
-function SimulateEmailClient(user_action: string, information: string, context: string) -> (GetEmailListInput | GetEmailDetailsInput | SendEmailInput | DeleteEmailInput | HTMLContent)[] {
+// Uses List output format due to Gemini somehow performs better with List output instead of Single output.
+function SimulateEmailClient(messages: Message[]) -> GetEmailListInput | GetEmailDetailsInput | SendEmailInput | DeleteEmailInput | HTMLContent{
   client GeminiClient
 
   prompt #"
@@ -46,22 +60,16 @@ function SimulateEmailClient(user_action: string, information: string, context: 
     <RULES>
     1. The HTML generated should not have any actual functionality, such as onclick, href, etc.
     2. The HTML generated is just a representation of what the user should see in the email client, while the actual functionality is handled the agentic email client.
-    3. The HTML generated should include all the basic functionality of an email client, such as navigation, sending emails, deleting emails, etc.
+    3. The HTML generated should include all the basic functionality placeholders of an email client, such as navigation, sending emails, deleting emails, etc.
     </RULES>
 
-    {{ ctx.output_format }}
+    {{ PrintMessages(messages) }}
 
     {{ _.role("user") }}
 
-    User Interaction:
-    {{ user_action }}
+    Decide the next action
 
-    Information from tools:
-    {{ information }}
-
-    Previous Context:
-    {{ context }}
-
+    {{ ctx.output_format }}
   "#
 }
 
@@ -69,81 +77,41 @@ function SimulateEmailClient(user_action: string, information: string, context: 
 test AfterAuthentication {
   functions [SimulateEmailClient]
   args {
-    user_action #"
-      User just finished authenticating with the email client. Show the inbox.
-    "#
-    information #"
-
-    "#
-    context #"
-
-    "#
+    messages [
+      {
+        role "user"
+        content #"
+          User just finished authenticating with the email client. Show the inbox.
+        "#
+      }
+    ]
   }
 }
 
 test AfterEmailList {
   functions [SimulateEmailClient]
   args {
-    user_action #"
-    "#
-    information #"
+    messages [
       {
-      "id": "195dbdf6464e71d0",
-      "subject": "Important Project Update",
-      "from": "Project Manager \u003Cpm@company.com\u003E",
-      "date": "Mon, 31 Mar 2025 10:15:22 GMT",
-      "snippet": "Hello team, I wanted to update you on the progress of our current project. We've made significant strides in the past week, and I'd like to schedule a meeting to discuss our next steps. Please review the"
-    },
-    {
-      "id": "195dbd5d10573abd",
-      "subject": "Invitation: Company Picnic",
-      "from": "HR Department \u003Chr@company.com\u003E",
-      "date": "Sun, 30 Mar 2025 14:45:00 -0700",
-      "snippet": "Dear Employees, We are excited to announce our annual company picnic! This year's event will be held on Saturday, April 12th, at Sunny Park. We have planned a day full of fun activities, delicious food, and"
-    },
-    "#
-    context #"
-
-    "#
-  }
-}
-
-test AfterEmailClick {
-  functions [SimulateEmailClient]
-  args {
-    user_action #"
-      User clicked on the email with subject "Quarterly Team Meeting - Agenda and Updates"
-    "#
-    information #"
+        role "user"
+        content #"
+          User just finished authenticating with the email client. Show the inbox.
+        "#
+      },
       {
-        "id": "195dbdf6464e71d0",
-        "subject": "Quarterly Team Meeting - Agenda and Updates",
-        "from": "Team Lead <teamlead@company.com>",
-        "to": "team@company.com",
-        "date": "Mon, 31 Mar 2025 09:30:00 GMT",
-        "body": "Dear Team,\n\nI hope this email finds you well. Our quarterly team meeting is scheduled for next week, and I wanted to share the agenda and some important updates.\n\nAgenda:\n1. Q1 Performance Review\n2. Upcoming Projects Overview\n3. Team Building Activity Announcement\n4. Q&A Session\n\nPlease come prepared with any questions or topics you'd like to discuss. If you have any specific items you want to add to the agenda, please let me know by EOD tomorrow.\n\nLooking forward to our productive session!\n\nBest regards,\nYour Team Lead",
-        "snippet": "Dear Team, I hope this email finds you well. Our quarterly team meeting is scheduled for next week, and I wanted to share the agenda and some important updates."
+        role "assistant"
+        content #"
+          - **Subject:** Important Project Update  
+            **From:** Project Manager <pm@company.com>  
+            **Date:** Mon, 31 Mar 2025 10:15:22 GMT  
+            **Snippet:** Hello team, I wanted to update you on the progress of our current project. We've made significant strides in the past week, and I'd like to schedule a meeting to discuss our next steps. Please review the...
+
+          - **Subject:** Invitation: Company Picnic  
+            **From:** HR Department <hr@company.com>  
+            **Date:** Sun, 30 Mar 2025 14:45:00 -0700  
+            **Snippet:** Dear Employees, We are excited to announce our annual company picnic! This year's event will be held on Saturday, April 12th, at Sunny Park. We have planned a day full of fun activities, delicious food, and...
+        "#
       }
-    "#
-    context #"
-    Information: {"id":"195dbdf6464e71d0","subject":"Important Update: New Project Management Tool","from":"IT Department <it@company.com>","to":"all-employees@company.com","date":"Mon, 15 Apr 2025 09:00:00 -0700","body":"Dear Colleagues,\r\n\r\nWe are excited to announce the implementation of a new project management tool, effective May 1, 2025. This tool will streamline our workflow and improve collaboration across departments.\r\n\r\nKey Points:\r\n\r\n1. Launch Date: May 1, 2025\r\n2. Mandatory Training: April 20-30, 2025\r\n3. Features: Task tracking, time management, team collaboration\r\n4. Benefits: Increased productivity, better resource allocation\r\n\r\nPlease note that all employees are required to complete the online training course by April 30. You will receive a separate email with login credentials for the training platform.\r\n\r\nIf you have any questions or concerns, please don't hesitate to reach out to the IT support team.\r\n\r\nBest regards,\r\nIT Department","snippet":"Dear Colleagues, We are excited to announce the implementation of a new project management tool, effective May 1, 2025. This tool will streamline our workflow and improve collaboration across departments."}
-    HTML Generated: <html><body><h1>Email Details</h1><p><strong>Subject:</strong> Quarterly Team Meeting - Agenda and Updates</p><p><strong>From:</strong> Team Lead &lt;teamlead@company.com&gt;</p><p><strong>To:</strong> team@company.com</p><p><strong>Date:</strong> Mon, 31 Mar 2025 09:30:00 GMT</p><p><strong>Body:</strong></p><pre>Dear Team,
-
-    I hope this email finds you well. Our quarterly team meeting is scheduled for next week, and I wanted to share the agenda and some important updates.
-
-    Agenda:
-    1. Q1 Performance Review
-    2. Upcoming Projects Overview
-    3. Team Building Activity Announcement
-    4. Q&A Session
-
-    Please come prepared with any questions or topics you'd like to discuss. If you have any specific items you want to add to the agenda, please let me know by EOD tomorrow.
-
-    Looking forward to our productive session!
-
-    Best regards,
-    Your Team Lead</pre></body></html>
-    "#
+    ] 
   }
 }
-

@@ -7,6 +7,7 @@ import dotenv from "dotenv"; // For loading environment variables from .env file
 
 // --- BAML Client Import ---
 import { b } from "../baml_client";
+import { Message } from "../baml_client/types";
 
 // --- Load Environment Variables ---
 dotenv.config();
@@ -119,7 +120,7 @@ const oauthCallbackHandler = async (req: Request, res: Response) => {
 
     // Redirect the user back to the main page of your application with authentication flag
     console.log("Redirecting back to application root with authentication flag...");
-    res.redirect("/?justAuthenticated=true");
+    res.redirect("/client.html");
   } catch (error) {
     console.error("Error exchanging authorization code for tokens:", error);
     // Check if error is an AxiosError or similar to get more details
@@ -412,9 +413,43 @@ async function deleteEmail(messageId: string): Promise<any | null> {
 
 console.log("Gmail API tool functions added.");
 
+// Helper function to format JSON schemas as Markdown
+function formatJsonToMarkdown(data: any, toolName: string): string {
+  // Handle null or undefined input
+  if (!data) {
+    return `**${toolName} Result:** Failed to fetch data.`;
+  }
+
+  // Handle empty array
+  if (Array.isArray(data) && data.length === 0) {
+    return `**${toolName} Result:** No data found.`;
+  }
+
+  // Helper to format a single object's key-value pairs
+  const formatObject = (obj: any): string => {
+    const lines = Object.entries(obj).map(([key, value]) => {
+      // Capitalize the first letter of the key for display
+      const formattedKey = key.charAt(0).toUpperCase() + key.slice(1);
+      // Handle null or undefined values
+      const formattedValue = value != null ? value.toString() : "N/A";
+      return `  **${formattedKey}:** ${formattedValue}`;
+    });
+    return lines.join('\n');
+  };
+
+  // If data is an array, format each object as a list item
+  if (Array.isArray(data)) {
+    const items = data.map((item, index) => `${toolName} result- ${formatObject(item)}`).join('\n\n');
+    return items || `**${toolName} Result:** No valid data found.`;
+  }
+
+  // If data is a single object, format it as a single list item
+  return `- ${formatObject(data)}`;
+}
+
 // --- Call the Email Client Agent ---
 // Store agent context for each user session (in a real app, this would be per-user)
-let agentContextHistory: string = "";
+let agentContextHistory: Message[] = []; // Store the context history for the agent
 
 async function callEmailClientAgent(
   user_interaction: string
@@ -422,213 +457,136 @@ async function callEmailClientAgent(
   console.log(
     `Calling email client agent with user_interaction: ${user_interaction}`
   );
-
-  let current_information = ""; // Start with empty information
-  let current_context = agentContextHistory; // Use the stored context history
-  let action = user_interaction; // Initial action is the user interaction (e.g., click target)
-
-  // Add counters to track repetitive tool calls
-  let toolCallCounts: Record<string, number> = {
-    "GetEmailListInput": 0,
-    "GetEmailDetailsInput": 0,
-    "SendEmailInput": 0,
-    "DeleteEmailInput": 0
-  };
-  let lastToolCalled: string | null = null;
-
-  console.log(`Starting agent loop with context size: ${current_context.length} characters`);
-  if (current_context) {
-    console.log(`Context contains information from the previous agent loop only`);
+  
+  // Add userMessage to agent context history
+  const userMessage : Message ={
+    role: "user",
+    content: user_interaction,
   }
+  agentContextHistory.push(userMessage);
 
   while (true) {
-    // Call the BAML client's SimulateEmailClient function
-    const results = await b.SimulateEmailClient(action, current_information, current_context);
-    console.log("SimulateEmailClient returned:", results);
 
-    // Check if results is an array and process it
-    if (!Array.isArray(results)) {
-      console.error(
-        "Expected an array from SimulateEmailClient, got:",
-        results
-      );
+    // Call the BAML client's SimulateEmailClient function
+    const result = await b.SimulateEmailClient(agentContextHistory);
+    console.log("SimulateEmailClient returned:", result);
+
+    // Check if result is null or undefined
+    if (!result) {
+      console.error("SimulateEmailClient returned null or undefined");
       return null;
     }
 
-    let hasHTML = false;
-    let htmlContent: string | null = null;
+    let content: string;
 
-    // Process results in sequence to handle tool calls before returning HTML
-    for (const result of results) {
-      if (result.class_name === "HTMLContent") {
-        // Check if the result is of type HTMLContent
-        // If HTML is found, store it
-        htmlContent = result.content;
-        hasHTML = true;
+    // Process the single result based on its class_name
+    if (result.class_name === "HTMLContent") {
+      // Handle HTMLContent
+      const htmlContent = result.content;
+      content = JSON.stringify(htmlContent);
+      console.log("HTML content found:", content);
 
-        // Use the HTML content as-is from the LLM
-      } else if (result.class_name === "GetEmailListInput") {
-        // Track repetitive tool calls
-        toolCallCounts["GetEmailListInput"]++;
+      const htmlMessage: Message = {
+        role: "assistant",
+        content: content,
+      };
 
-        // Check if this is a repetitive call
-        if (lastToolCalled === "GetEmailListInput") {
-          const repeatCount = toolCallCounts["GetEmailListInput"];
-          if (repeatCount > 1) {
-            // Add warning to context about repetitive calls
-            current_context += `\nWARNING: You have already called GetEmailList ${repeatCount} times. You should move on.\n`;
-            console.log(`Detected repetitive GetEmailList calls: ${repeatCount} times`);
-          }
-        }
-        lastToolCalled = "GetEmailListInput";
-
-        // Handle GetEmailList tool call
-        const emailList = await getEmailList(result.maxResults);
-        if (emailList) {
-          current_information = JSON.stringify(emailList);
-
-          // Add to context that we fetched an email list
-          current_context += `\nTool Call: GetEmailList\nResult: Retrieved ${emailList.length} emails\n`;
-
-          // Add a summary of the emails to the context
-          current_context += "Email Summary:\n";
-          emailList.forEach((email: any) => {
-            current_context += `Email ID: ${email.id}, Subject: "${email.subject}", From: ${email.from}\n`;
-          });
-
-          console.log(
-            "Updated current_information with email list:",
-            current_information
-          );
-        } else {
-          current_information = JSON.stringify({
-            error: "Failed to fetch email list",
-          });
-          console.error("Failed to fetch email list");
-        }
-      } else if (result.class_name === "GetEmailDetailsInput") {
-        // Track repetitive tool calls
-        toolCallCounts["GetEmailDetailsInput"]++;
-
-        // Check if this is a repetitive call
-        if (lastToolCalled === "GetEmailDetailsInput") {
-          const repeatCount = toolCallCounts["GetEmailDetailsInput"];
-          if (repeatCount > 1) {
-            // Add warning to context about repetitive calls
-            current_context += `\nWARNING: You have already called GetEmailDetails ${repeatCount} times. You should move on.\n`;
-            console.log(`Detected repetitive GetEmailDetails calls: ${repeatCount} times`);
-          }
-        }
-        lastToolCalled = "GetEmailDetailsInput";
-
-        // Handle GetEmailDetails tool call
-        const emailDetails = await getEmailDetails(result.id);
-        if (emailDetails) {
-          current_information = JSON.stringify(emailDetails);
-
-          // Add to context that we fetched email details with the specific ID
-          current_context += `\nTool Call: GetEmailDetails\nEmail ID: ${result.id}\nSubject: ${emailDetails.subject}\nFrom: ${emailDetails.from}\nDate: ${emailDetails.date}\n`;
-
-          console.log(
-            "Updated current_information with email details:",
-            current_information
-          );
-        } else {
-          current_information = JSON.stringify({
-            error: `Failed to fetch email details for ID ${result.id}`,
-          });
-          console.error(`Failed to fetch email details for ID ${result.id}`);
-        }
-      } else if (result.class_name === "SendEmailInput") {
-        // Track repetitive tool calls
-        toolCallCounts["SendEmailInput"]++;
-
-        // Check if this is a repetitive call
-        if (lastToolCalled === "SendEmailInput") {
-          const repeatCount = toolCallCounts["SendEmailInput"];
-          if (repeatCount > 1) {
-            // Add warning to context about repetitive calls
-            current_context += `\nWARNING: You have already called SendEmail ${repeatCount} times. You should move on.\n`;
-            console.log(`Detected repetitive SendEmail calls: ${repeatCount} times`);
-          }
-        }
-        lastToolCalled = "SendEmailInput";
-
-        // Handle SendEmail tool call
-        const emailResult = await sendEmail(result.to, result.subject, result.body);
-        if (emailResult && emailResult.success) {
-          current_information = JSON.stringify(emailResult);
-
-          // Add to context that we sent an email
-          current_context += `\nTool Call: SendEmail\nTo: ${result.to}\nSubject: ${result.subject}\nResult: Email sent successfully with ID: ${emailResult.messageId}\n`;
-
-          console.log(
-            "Updated current_information with send email result:",
-            current_information
-          );
-        } else {
-          current_information = JSON.stringify({
-            error: "Failed to send email",
-          });
-          console.error("Failed to send email");
-        }
-      } else if (result.class_name === "DeleteEmailInput") {
-        // Track repetitive tool calls
-        toolCallCounts["DeleteEmailInput"]++;
-
-        // Check if this is a repetitive call
-        if (lastToolCalled === "DeleteEmailInput") {
-          const repeatCount = toolCallCounts["DeleteEmailInput"];
-          if (repeatCount > 1) {
-            // Add warning to context about repetitive calls
-            current_context += `\nWARNING: You have already called DeleteEmail ${repeatCount} times. You should move on.\n`;
-            console.log(`Detected repetitive DeleteEmail calls: ${repeatCount} times`);
-          }
-        }
-        lastToolCalled = "DeleteEmailInput";
-
-        // Handle DeleteEmail tool call
-        const deleteResult = await deleteEmail(result.id);
-        if (deleteResult && deleteResult.success) {
-          current_information = JSON.stringify(deleteResult);
-
-          // Add to context that we deleted an email
-          current_context += `\nTool Call: DeleteEmail\nEmail ID: ${result.id}\nResult: Email moved to trash successfully\n`;
-
-          console.log(
-            "Updated current_information with delete email result:",
-            current_information
-          );
-        } else {
-          current_information = JSON.stringify({
-            error: `Failed to delete email with ID ${result.id}`,
-          });
-          console.error(`Failed to delete email with ID ${result.id}`);
-        }
-      }
-      // Add handling for other potential result.class_name values if necessary
-    }
-
-    // If HTML was found, update context history and return the HTML
-    // This code runs AFTER all async operations in the loop are complete
-    if (hasHTML) {
-      // Reset the context with only the current loop information
-      // Include both the user interaction, the information retrieved, and the HTML response
-      let newContext = `User Interaction: ${action}\nInformation: ${current_information}\nHTML Generated: ${htmlContent ? "[HTML content generated]" : "None"}\n`;
-
-      // Replace (not append to) the agent context history for the next agent loop
-      agentContextHistory = newContext;
-
-      console.log("Reset agent context history. Current size:", agentContextHistory.length);
+      // Append the message to context history
+      agentContextHistory.push(htmlMessage);
+      console.log(
+        "Appended HTML content to agent context history. Current size:",
+        agentContextHistory.length
+      );
       console.log("Returning HTML content");
       return htmlContent;
-    }
+    } else if (result.class_name === "GetEmailListInput") {
+      // Handle GetEmailList tool call
+      const emailList = await getEmailList(result.maxResults);
 
-    // If no HTML, loop again with updated information and no new action
-    // current_information will be correctly updated from any tool calls above
-    action = ""; // Clear action for subsequent calls after tool execution
+      try {
+        if (emailList) {
+          content = formatJsonToMarkdown(emailList, "GetEmailList");
+        } else {
+          content = "Tool Call: GetEmailList\nResult: Failed to fetch email list";
+        }
+      } catch (error) {
+        console.error("Failed to stringify emailList:", error);
+        content = "Tool Call: GetEmailList\nResult: Failed to fetch email list";
+      }
+
+      const emailListMessage: Message = {
+        role: "assistant",
+        content: content,
+      };
+      agentContextHistory.push(emailListMessage);
+    } else if (result.class_name === "GetEmailDetailsInput") {
+      // Handle GetEmailDetails tool call
+      const emailDetails = await getEmailDetails(result.id);
+
+      try {
+        if (emailDetails) {
+          content = formatJsonToMarkdown(emailDetails, "GetEmailDetails");
+        } else {
+          content = `Tool Call: GetEmailDetails\nEmail ID: ${result.id}\nResult: Failed to fetch email details`;
+        }
+      } catch (error) {
+        console.error(`Failed to stringify emailDetails for ID ${result.id}:`, error);
+        content = `Tool Call: GetEmailDetails\nEmail ID: ${result.id}\nResult: Failed to fetch email details`;
+      }
+
+      const emailDetailsMessage: Message = {
+        role: "assistant",
+        content: content,
+      };
+      agentContextHistory.push(emailDetailsMessage);
+    } else if (result.class_name === "SendEmailInput") {
+      // Handle SendEmail tool call
+      const emailResult = await sendEmail(result.to, result.subject, result.body);
+
+      try {
+        if (emailResult && emailResult.success) {
+          content = formatJsonToMarkdown(emailResult, "SendEmail");
+        } else {
+          content = `Tool Call: SendEmail\nTo: ${result.to}\nSubject: ${result.subject}\nResult: Failed to send email`;
+        }
+      } catch (error) {
+        console.error("Failed to stringify sendEmail result:", error);
+        content = `Tool Call: SendEmail\nTo: ${result.to}\nSubject: ${result.subject}\nResult: Failed to send email`;
+      }
+
+      const sendEmailMessage: Message = {
+        role: "assistant",
+        content: content,
+      };
+      agentContextHistory.push(sendEmailMessage);
+    } else if (result.class_name === "DeleteEmailInput") {
+      // Handle DeleteEmail tool call
+      const deleteResult = await deleteEmail(result.id);
+
+      try {
+        if (deleteResult && deleteResult.success) {
+          content = formatJsonToMarkdown(deleteResult, "DeleteEmail");
+        } else {
+          content = `Tool Call: DeleteEmail\nEmail ID: ${result.id}\nResult: Failed to delete email`;
+        }
+      } catch (error) {
+        console.error(`Failed to stringify deleteEmail result for ID ${result.id}:`, error);
+        content = `Tool Call: DeleteEmail\nEmail ID: ${result.id}\nResult: Failed to delete email`;
+      }
+
+      const deleteEmailMessage: Message = {
+        role: "assistant",
+        content: content,
+      };
+      agentContextHistory.push(deleteEmailMessage);
+    } else {
+      // Handle unexpected class_name
+      console.error("Unexpected class_name from SimulateEmailClient:", result);
+      return null;
+    }
   }
 }
+
 const llmHandler = async (req: Request, res: Response) => {
   console.log("Received request at /api/llm");
   const { target } = req.body;
