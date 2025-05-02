@@ -3,31 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Client</title>
+    <title>Login Page</title>
     <style>
-        /* Minimal styling for loading indicator */
-        #loading {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.9);
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000000;
+            font-family: Arial, sans-serif;
+            height: 100vh;
             display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            color: #333;
-            z-index: 1000;
+            align-items: flex-start;
+            padding-top: 20px;
+            padding-left: 20px;
+        }
+        
+        .login-button {
+            background-color: transparent;
+            color: white;
+            border: 1px solid white;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .login-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
         }
     </style>
 </head>
 <body>
-    <!-- Minimal shell that will be completely replaced by LLM content -->
-    <div id="loading">Connecting to email service...</div>
-    <div id="app"></div>
-
-    <!-- Script to handle authentication and LLM interaction -->
+    <button id="gmail-login" class="login-button">Login with Gmail</button>
     <script src="main.js"></script>
 </body>
 </html>
