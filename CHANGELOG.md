@@ -25,3 +25,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Delete and sent email tools implemented.
 - Better prompt for BAML AI layer implemented.
+
+## [0.1.3] - 2025-05-02
+### Added
+- Better interface for browser
+- Agentic workflow revamp for better message parsing
