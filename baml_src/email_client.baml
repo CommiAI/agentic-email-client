@@ -42,7 +42,7 @@ template_string PrintMessages(messages: Message[]) #"
 // Create a function to simulate an email client.
 // Uses List output format due to Gemini somehow performs better with List output instead of Single output.
 function SimulateEmailClient(messages: Message[]) -> GetEmailListInput | GetEmailDetailsInput | SendEmailInput | DeleteEmailInput | HTMLContent{
-  client GeminiClient
+  client SmolClient
 
   prompt #"
     {{ _.role("system") }}

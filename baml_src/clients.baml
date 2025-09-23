@@ -11,6 +11,26 @@ client<llm> GeminiClient {
   }
 }
 
+client<llm> OpenAIClient {
+  provider "openai"
+  options {
+    api_key env.OPENAI_API_KEY
+    model "gpt-4.1-mini"  // this is GPT-4.1
+    temperature 0.1
+  }
+}
+
+client<llm> SmolClient {
+  provider fallback
+  options {
+    strategy [
+      GeminiClient    // first choice
+      OpenAIClient    // fallback option
+    ]
+  }
+}
+
+
 // https://docs.boundaryml.com/docs/snippets/clients/retry
 retry_policy Constant {
   max_retries 3
