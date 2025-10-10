@@ -1,0 +1,24 @@
+review:
+  guidelines:
+    path: "**/*"
+    guideline: "Clean and non duplication code"
+  auto_review:
+    # Auto-review settings
+    auto_review:
+    enabled: true
+    draft: false
+    bot: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+    ignore_labels:
+      - "droid-skip"
+    excluded_base_branches:
+      - "example_branch"
+  # Other review settings
+  pr_summary: true
+  file_summaries: true
+  tips: true
+  github_action_repair: true
+  enable_skip_reason_comments: true
+      
