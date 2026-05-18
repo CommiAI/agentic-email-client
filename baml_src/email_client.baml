@@ -63,6 +63,10 @@ function SimulateEmailClient(messages: Message[]) -> GetEmailListInput | GetEmai
     3. The HTML generated should include all the basic functionality placeholders of an email client, such as navigation, sending emails, deleting emails, etc.
     </RULES>
 
+    <THEME_PRERFERENCE>
+    The email client will be render on a black canvas, theme the display towards theme color that pairs well with black background.
+    </THEME_PRERFERENCE>
+
     {{ PrintMessages(messages) }}
 
     {{ _.role("user") }}

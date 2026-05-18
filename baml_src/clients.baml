@@ -3,7 +3,7 @@
 client<llm> GeminiClient {
   provider google-ai
   options {
-    model "gemini-2.0-flash"
+    model "gemini-3.1-flash-lite-preview"
     api_key env.GOOGLE_API_KEY
     generationConfig {
       temperature 0.1
@@ -20,12 +20,22 @@ client<llm> OpenAIClient {
   }
 }
 
+client<llm> MercuryClient {
+  provider "openai"
+  options {
+    base_url "https://api.inceptionlabs.ai/v1"
+    api_key env.INCEPTION_API_KEY
+    model "mercury-2"
+    temperature 0.1
+  }
+}
+
 client<llm> SmolClient {
   provider fallback
   options {
     strategy [
-      GeminiClient    // first choice
-      OpenAIClient    // fallback option
+      MercuryClient   // first choice
+      GeminiClient    // fallback
     ]
   }
 }
