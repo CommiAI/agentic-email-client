@@ -1,16 +1,17 @@
+// --- Load Environment Variables ---
+// Must run before importing baml_client, since BAML snapshots process.env
+// at module-load time (see baml_client/globals.ts) — including BOUNDARY_API_KEY.
+import "dotenv/config";
+
 import express, { Request, Response, NextFunction } from "express"; // For creating the web server
 import { OAuth2Client } from "google-auth-library"; // Google's library for OAuth
 import { google, gmail_v1 } from "googleapis";
 import path from "path"; // Node.js module for working with file paths
 import axios from "axios"; // For making HTTP requests (if needed)
-import dotenv from "dotenv"; // For loading environment variables from .env file
 
 // --- BAML Client Import ---
 import { b } from "../baml_client";
 import { Message } from "../baml_client/types";
-
-// --- Load Environment Variables ---
-dotenv.config();
 
 // --- Initialize Express App ---
 const app = express();
